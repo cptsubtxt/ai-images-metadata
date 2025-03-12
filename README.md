@@ -14,11 +14,11 @@ Create a virtual env in python
 python3.12 -m venv venv
 ```
 
-Install dependencies
+## Install dependencies
 
-Windows
+### Windows
 
-Mac OS X
+### Mac OS X
 
 ```bash
 brew install exiftool
@@ -42,7 +42,7 @@ Install python modules
 pip install -r requirements.txt
 ```
 
-Run the program
+## Run the program
 
 ```bash
 python aim.py

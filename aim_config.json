@@ -1,0 +1,6 @@
+{
+    "model": "llava",
+    "keyword_count": 5,
+    "temperature": 0.5,
+    "tone": "concise, professional"
+}

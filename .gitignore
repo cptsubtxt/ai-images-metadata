@@ -175,3 +175,7 @@ cython_debug/
 
 # Folder with testimages
 test-images/
+test-image.jpg
+
+# Mac files
+.DS_Store
