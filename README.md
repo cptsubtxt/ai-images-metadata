@@ -39,7 +39,7 @@ source venv/bin/activate
 Install python modules
 
 ```bash
-pip -r requirements.txt
+pip install -r requirements.txt
 ```
 
 Run the program
