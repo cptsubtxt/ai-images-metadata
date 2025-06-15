@@ -4,6 +4,7 @@ import json
 from exiftool import ExifToolHelper
 import ollama
 import logging
+from datetime import datetime
 
 import base64
 from io import BytesIO
@@ -19,6 +20,7 @@ MODEL = "llava"
 TONE = "concise,professional" 
 TEMP = 0.5
 CONFIG_FILE = "aim_config.json"
+RESULTS_DIR = "." # Results file will be written in the script's execution directory
 
 def load_config():
     """Loads configuration from a JSON file."""
@@ -98,26 +100,28 @@ def extract_keywords(keywords_string):
     else:
         return []
 
-def process_image(image_path, config):
+def process_image(image_path, config, results_file):
     """Processes a single image."""
     logging.info(f"--- Processing image: {os.path.basename(image_path)} ---")
 
     tone = config['tone'].split(',')
     model_name = config['model']
-    keyword_count = config['keyword_count']
     temperature_setting = config['temperature']
 
     logging.info(f"Using tone: {tone[0]}, {tone[1]}")
-    logging.info(f"Number of Keywords used: {keyword_count}")
     logging.info(f"Using Ollama model: {model_name}")
     logging.info(f"Using temperature setting: {temperature_setting}")
+
+    headline = "N/A"
+    description = "N/A"
+    lstkeywords = []
 
     try:
         prompt_template = f"""
           You are a professional photojournalist. Analyze the following image and generate metadata with a {tone[0]} and {tone[1]} tone:
           Headline: Create a short, impactful title that captures the essence of the image.
           Description: Write a concise and informative summary that describes what is happening in the image.
-          Keywords: List {keyword_count} relevant and descriptive keywords, separated by commas.
+          Keywords: List {config['keyword_count']} relevant and descriptive keywords, separated by commas.
           Format your output exactly as follows:
           Headline: ...
           Description: ...
@@ -130,22 +134,18 @@ def process_image(image_path, config):
             logging.info("Model raw response:\n---\n%s\n---", ollama_response)
             lines = ollama_response.split('\n')
             
-            headline = ""
-            description = ""
-            keywords = []
-
             for line in lines:
                 if line.startswith("Headline:"):
                     headline = line.replace("Headline:", "").strip()
                 elif line.startswith("Description:"):
                     description = line.replace("Description:", "").strip()
                 elif line.startswith("Keywords:"):
-                    keywords = extract_keywords(line)
+                    lstkeywords = extract_keywords(line)
 
             # Remove quotation marks from headline and description
             headline = headline.strip('"')
             description = description.strip('"')
-            lstkeywords = [x.strip('"') for x in keywords]
+            lstkeywords = [x.strip('"') for x in lstkeywords]
 
             logging.info(f"Generated Headline: \"{headline}\"")
             logging.info(f"Generated Description: \"{description}\"")
@@ -168,6 +168,14 @@ def process_image(image_path, config):
 
     except Exception as e:
         logging.error(f"An unexpected error occurred while processing image {os.path.basename(image_path)}: {e}")
+    
+    finally:
+        # Write results to the file
+        results_file.write(f"Image Name: {os.path.basename(image_path)}\n")
+        results_file.write(f"  Headline: {headline}\n")
+        results_file.write(f"  Description: {description}\n")
+        results_file.write(f"  Keywords: {', '.join(lstkeywords)}\n")
+        results_file.write("-" * 50 + "\n") # Separator for readability
 
 def main():
     """Main function to process images."""
@@ -179,27 +187,39 @@ def main():
 
     config = load_config()
 
-    # The global variables are just defaults, the config should be the source of truth
-    # MODEL = config['model'] 
-    # TEMP = config['temperature']
-    # TONE = config['tone']
+    processed_image_count = 0
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    results_filename = f"metadata-run-{timestamp}.txt" # Will add count later
 
-    if os.path.isfile(args.path):
-        if args.path.lower().endswith(('.jpg', '.jpeg')):
-            process_image(args.path, config)
-        else:
-            logging.warning(f"Provided file '{args.path}' is not a JPEG image. Skipping.")
+    results_file_path = os.path.join(RESULTS_DIR, results_filename)
 
-    elif os.path.isdir(args.path):
-        logging.info(f"Processing all JPEG images in directory: {args.path}")
-        for filename in os.listdir(args.path):
-            if filename.lower().endswith(('.jpg', '.jpeg')):
-                image_path = os.path.join(args.path, filename)
-                process_image(image_path, config)
+    with open(results_file_path, "w", encoding="utf-8") as results_file:
+        results_file.write(f"Metadata Processing Run - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        results_file.write("=" * 60 + "\n\n")
+
+        if os.path.isfile(args.path):
+            if args.path.lower().endswith(('.jpg', '.jpeg')):
+                process_image(args.path, config, results_file)
+                processed_image_count += 1
             else:
-                logging.info(f"Skipping non-JPEG file: {filename}")
-    else:
-        logging.error(f"Invalid path provided: {args.path}. Please provide a valid file or directory path.")
+                logging.warning(f"Provided file '{args.path}' is not a JPEG image. Skipping.")
+
+        elif os.path.isdir(args.path):
+            logging.info(f"Processing all JPEG images in directory: {args.path}")
+            for filename in os.listdir(args.path):
+                if filename.lower().endswith(('.jpg', '.jpeg')):
+                    image_path = os.path.join(args.path, filename)
+                    process_image(image_path, config, results_file)
+                    processed_image_count += 1
+                else:
+                    logging.info(f"Skipping non-JPEG file: {filename}")
+        else:
+            logging.error(f"Invalid path provided: {args.path}. Please provide a valid file or directory path.")
+        
+        # Update the filename with the count of processed images
+        final_results_filename = f"metadata-run-{timestamp}-{processed_image_count}_images.txt"
+        os.rename(results_file_path, os.path.join(RESULTS_DIR, final_results_filename))
+        logging.info(f"Processing complete. Results saved to: {os.path.join(RESULTS_DIR, final_results_filename)}")
 
 if __name__ == "__main__":
     main()
