@@ -100,7 +100,7 @@ def extract_keywords(keywords_string):
     else:
         return []
 
-def process_image(image_path, config, results_file):
+def process_image(image_path, config, results_file, report_only=False):
     """Processes a single image."""
     logging.info(f"--- Processing image: {os.path.basename(image_path)} ---")
 
@@ -151,18 +151,21 @@ def process_image(image_path, config, results_file):
             logging.info(f"Generated Description: \"{description}\"")
             logging.info(f"Generated Keywords: {lstkeywords}")
             
-            with ExifToolHelper() as et:
-                metadata = {
-                    "IPTC:Headline": headline,
-                    "XMP-dc:Title": headline,
-                    "IPTC:Caption-Abstract": description,
-                    "EXIF:UserComment": description,
-                    "XMP-dc:Description": description,
-                    "IPTC:Keywords": lstkeywords,
-                    "XMP-dc:Subject": lstkeywords,
-                }
-                et.set_tags(image_path, metadata, params=["-overwrite_original"])
-            logging.info(f"Successfully wrote metadata to: {os.path.basename(image_path)}")
+            if not report_only:
+                with ExifToolHelper() as et:
+                    metadata = {
+                        "IPTC:Headline": headline,
+                        "XMP-dc:Title": headline,
+                        "IPTC:Caption-Abstract": description,
+                        "EXIF:UserComment": description,
+                        "XMP-dc:Description": description,
+                        "IPTC:Keywords": lstkeywords,
+                        "XMP-dc:Subject": lstkeywords,
+                    }
+                    et.set_tags(image_path, metadata, params=["-overwrite_original"])
+                logging.info(f"Successfully wrote metadata to: {os.path.basename(image_path)}")
+            else:
+                logging.info(f"Report-only mode: Skipped writing metadata to {os.path.basename(image_path)}")
         else:
             logging.warning(f"No Ollama response for image: {os.path.basename(image_path)}")
 
@@ -183,6 +186,8 @@ def main():
 
     parser = argparse.ArgumentParser(description="Process images with Ollama and ExifTool.")
     parser.add_argument("path", help="Path to an image file or a directory containing images.")
+    parser.add_argument("--report-only", action="store_true", 
+                        help="If set, images' metadata will not be modified. Only a report file will be generated.")
     args = parser.parse_args()
 
     config = load_config()
@@ -195,11 +200,13 @@ def main():
 
     with open(results_file_path, "w", encoding="utf-8") as results_file:
         results_file.write(f"Metadata Processing Run - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        if args.report_only:
+            results_file.write("--- REPORT ONLY MODE ---\n")
         results_file.write("=" * 60 + "\n\n")
 
         if os.path.isfile(args.path):
             if args.path.lower().endswith(('.jpg', '.jpeg')):
-                process_image(args.path, config, results_file)
+                process_image(args.path, config, results_file, args.report_only)
                 processed_image_count += 1
             else:
                 logging.warning(f"Provided file '{args.path}' is not a JPEG image. Skipping.")
@@ -209,7 +216,7 @@ def main():
             for filename in os.listdir(args.path):
                 if filename.lower().endswith(('.jpg', '.jpeg')):
                     image_path = os.path.join(args.path, filename)
-                    process_image(image_path, config, results_file)
+                    process_image(image_path, config, results_file, args.report_only)
                     processed_image_count += 1
                 else:
                     logging.info(f"Skipping non-JPEG file: {filename}")
