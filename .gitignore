@@ -179,3 +179,6 @@ test-image.jpg
 
 # Mac files
 .DS_Store
+
+# Report files should not be committed
+metadata-run*txt
