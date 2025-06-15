@@ -119,8 +119,8 @@ def process_image(image_path, config, results_file, report_only=False):
     try:
         prompt_template = f"""
           You are a professional photojournalist. Analyze the following image and generate metadata with a {tone[0]} and {tone[1]} tone:
-          Headline: Create a short, impactful title that captures the essence of the image.
-          Description: Write a concise and informative summary that describes what is happening in the image.
+          Headline: Create a short, impactful title that captures the subject of the image. Don't exeed over 8 words.
+          Description: Write a concise and informative summary as a photographer that describes what is happening in the image. Don't exceed 300 characters.
           Keywords: List {config['keyword_count']} relevant and descriptive keywords, separated by commas.
           Format your output exactly as follows:
           Headline: ...
